@@ -24,7 +24,7 @@ public final class HTTPLogger: NSURLProtocol {
     
     // MARK: - Public
     
-    public static var logClosure: (String -> Void) = { print($0) }
+    public static var printTarget: (String -> Void) = { print($0) }
     
     public class func register() {
         NSURLProtocol.registerClass(self)
@@ -34,10 +34,8 @@ public final class HTTPLogger: NSURLProtocol {
         NSURLProtocol.unregisterClass(self)
     }
     
-    public class func defaultSessionConfiguration() -> NSURLSessionConfiguration {
-        let config = NSURLSessionConfiguration.defaultSessionConfiguration()
-        config.protocolClasses?.insert(HTTPLogger.self, atIndex: 0)
-        return config
+    public class func setup(configuration: NSURLSessionConfiguration) {        
+        configuration.protocolClasses?.insert(HTTPLogger.self, atIndex: 0)
     }
     
     //MARK: - NSURLProtocol
@@ -119,7 +117,7 @@ public final class HTTPLogger: NSURLProtocol {
             logString += "Suggestion: \(suggestion)\n"
         }
         logString += "\n\n*************************\n\n"
-        HTTPLogger.logClosure(logString)
+        HTTPLogger.printTarget(logString)
     }
     
     public func logRequest(request: NSURLRequest) {
@@ -159,7 +157,7 @@ public final class HTTPLogger: NSURLProtocol {
         }
         
         logString += "\n\n*************************\n\n"
-        HTTPLogger.logClosure(logString)
+        HTTPLogger.printTarget(logString)
     }
     
     public func logResponse(response: NSURLResponse, data: NSData? = nil) {
@@ -201,7 +199,7 @@ public final class HTTPLogger: NSURLProtocol {
         }
         
         logString += "\n\n*************************\n\n"
-        HTTPLogger.logClosure(logString)
+        HTTPLogger.printTarget(logString)
     }
     
     public func logHeaders(headers: [String: AnyObject]) -> String {
