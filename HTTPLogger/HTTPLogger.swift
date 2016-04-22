@@ -20,11 +20,35 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 // THE SOFTWARE.
 
-public final class HTTPLogger: NSURLProtocol {
+public protocol HTTPLoggerConfigurationType {
+    func printLog(string: String)
+    func enableCapture(request: NSURLRequest) -> Bool
+}
+
+extension HTTPLoggerConfigurationType {
+    
+    public func printLog(string: String) {
+        print(string)
+    }
+    
+    public func enableCapture(request: NSURLRequest) -> Bool {
+        #if DEBUG
+            return true
+        #else
+            return false
+        #endif
+    }
+}
+
+public struct HTTPLoggerDefaultConfiguration: HTTPLoggerConfigurationType {
+    
+}
+
+public final class HTTPLogger: NSURLProtocol, NSURLSessionDelegate {
     
     // MARK: - Public
     
-    public static var printTarget: (String -> Void) = { print($0) }
+    public static var configuration: HTTPLoggerConfigurationType = HTTPLoggerDefaultConfiguration()
     
     public class func register() {
         NSURLProtocol.registerClass(self)
@@ -34,19 +58,27 @@ public final class HTTPLogger: NSURLProtocol {
         NSURLProtocol.unregisterClass(self)
     }
     
-    public class func setup(configuration: NSURLSessionConfiguration) {
-        configuration.protocolClasses?.insert(HTTPLogger.self, atIndex: 0)
+    public class func defaultSessionConfiguration() -> NSURLSessionConfiguration {
+        let config = NSURLSessionConfiguration.defaultSessionConfiguration()
+        config.protocolClasses?.insert(HTTPLogger.self, atIndex: 0)
+        return config
     }
     
     //MARK: - NSURLProtocol
     
     public override class func canInitWithRequest(request: NSURLRequest) -> Bool {
+        
+        guard HTTPLogger.configuration.enableCapture(request) == true else {
+            return false
+        }
+        
         guard self.propertyForKey(requestHandledKey, inRequest: request) == nil else {
             return false
         }
         
         return true
     }
+    
     
     public override class func canonicalRequestForRequest(request: NSURLRequest) -> NSURLRequest {
         return request
@@ -59,49 +91,45 @@ public final class HTTPLogger: NSURLProtocol {
     public override func startLoading() {
         guard let req = request.mutableCopy() as? NSMutableURLRequest where newRequest == nil else { return }
         
-        newRequest = req
+        self.newRequest = req
         
         HTTPLogger.setProperty(true, forKey: HTTPLogger.requestHandledKey, inRequest: newRequest!)
         HTTPLogger.setProperty(NSDate(), forKey: HTTPLogger.requestTimeKey, inRequest: newRequest!)
         
-        connection = NSURLConnection(request: newRequest!, delegate: self)
-        NSURLConnection(request: <#T##NSURLRequest#>, delegate: <#T##AnyObject?#>, startImmediately: <#T##Bool#>)
+        let session = NSURLSession(configuration: NSURLSessionConfiguration.defaultSessionConfiguration(), delegate: self, delegateQueue: nil)
+        
+        session.dataTaskWithRequest(request) { (data, response, error) -> Void in
+            if let error = error {
+                self.client?.URLProtocol(self, didFailWithError: error)
+                self.logError(error)
+                return
+            }
+            guard let response = response, let data = data else { return }
+            
+            // クライアントに渡すところも実装してあげないとリダイレクトをしくじることがある
+            self.client?.URLProtocol(self, didReceiveResponse: response, cacheStoragePolicy: NSURLCacheStoragePolicy.Allowed)
+            self.client?.URLProtocol(self, didLoadData: data)
+            self.client?.URLProtocolDidFinishLoading(self)
+            self.logResponse(response, data: data)
+            }.resume()
         
         logRequest(newRequest!)
     }
     
     public override func stopLoading() {
-        connection?.cancel()
-        connection = nil
     }
     
-    // MARK: NSURLConnectionDelegate
-    
-    func connection(connection: NSURLConnection!, didReceiveResponse response: NSURLResponse!) {
-        let policy = NSURLCacheStoragePolicy(rawValue: request.cachePolicy.rawValue) ?? .NotAllowed
-        client?.URLProtocol(self, didReceiveResponse: response, cacheStoragePolicy: policy)
+    func URLSession(
+        session: NSURLSession,
+        task: NSURLSessionTask,
+        willPerformHTTPRedirection response: NSHTTPURLResponse,
+                                   newRequest request: NSURLRequest,
+                                              completionHandler: (NSURLRequest?) -> Void) {
         
-        self.response = response
-        self.data = NSMutableData()
-    }
-    
-    func connection(connection: NSURLConnection!, didReceiveData data: NSData!) {
-        client?.URLProtocol(self, didLoadData: data)
-        self.data?.appendData(data)
-    }
-    
-    func connectionDidFinishLoading(connection: NSURLConnection!) {
-        client?.URLProtocolDidFinishLoading(self)
+        self.client?.URLProtocol(self, wasRedirectedToRequest: request, redirectResponse: response)
         
-        if let response = response {
-            logResponse(response, data: data)
-        }
     }
     
-    func connection(connection: NSURLConnection!, didFailWithError error: NSError!) {
-        client?.URLProtocol(self, didFailWithError: error)
-        logError(error)
-    }
     
     //MARK: - Logging
     
@@ -118,7 +146,7 @@ public final class HTTPLogger: NSURLProtocol {
             logString += "Suggestion: \(suggestion)\n"
         }
         logString += "\n\n*************************\n\n"
-        HTTPLogger.printTarget(logString)
+        HTTPLogger.configuration.printLog(logString)
     }
     
     public func logRequest(request: NSURLRequest) {
@@ -131,7 +159,7 @@ public final class HTTPLogger: NSURLProtocol {
             logString += "Header:\n"
             logString += logHeaders(headers) + "\n"
         }
-
+        
         if let data = request.HTTPBody,
             let bodyString = NSString(data: data, encoding: NSUTF8StringEncoding) {
             
@@ -158,7 +186,7 @@ public final class HTTPLogger: NSURLProtocol {
         }
         
         logString += "\n\n*************************\n\n"
-        HTTPLogger.printTarget(logString)
+        HTTPLogger.configuration.printLog(logString)
     }
     
     public func logResponse(response: NSURLResponse, data: NSData? = nil) {
@@ -200,7 +228,7 @@ public final class HTTPLogger: NSURLProtocol {
         }
         
         logString += "\n\n*************************\n\n"
-        HTTPLogger.printTarget(logString)
+        HTTPLogger.configuration.printLog(logString)
     }
     
     public func logHeaders(headers: [String: AnyObject]) -> String {
@@ -218,8 +246,8 @@ public final class HTTPLogger: NSURLProtocol {
     private static let requestHandledKey = "RequestLumberjackHandleKey"
     private static let requestTimeKey = "RequestLumberjackRequestTime"
     
-    private var connection: NSURLConnection?
     private var data: NSMutableData?
     private var response: NSURLResponse?
     private var newRequest: NSMutableURLRequest?
 }
+
