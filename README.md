@@ -7,10 +7,10 @@ Logging HTTP Request of NSURLSession.
 
 
 ### Request Log
-<img width=300 src="request.png">
+![](request.png)
 
 ### Response Log
-<img width=300 src="response.png">
+![](response.png)
 
 ## Usage (Setup)
 
