@@ -31,13 +31,28 @@ Alamofire.Manager(configuration: configuration)
 ```
 
 ### Custom
-- Use custom print function
+
+- Create and Set Configuration
 
 ```swift
-HTTPLogger.printTarget = { Log.debug($0) }
-HTTPLogger.printTarget = { NSLog($0) }
+struct Configuration: HTTPLoggerConfigurationType {
+  func printLog(string: String) {
+    NSLog(string)
+  }
+
+  public func enableCapture(request: NSURLRequest) -> Bool {
+    #if DEBUG
+      return true
+    #else
+      return false
+    #endif
+  }
+}
 ```
 
+```swift
+HTTPLogger.configuration = Configuration()
+```
 
 ## Installation
 HTTPLogger is available through [CocoaPods](http://cocoapods.org). To install it, simply add the following line to your Podfile:
