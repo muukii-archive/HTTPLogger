@@ -3,6 +3,14 @@
 
 ## About
 
+Logging HTTP Request of NSURLSession.
+
+
+### Request Log
+![](Request.png)
+
+### Response Log
+![](Response.png)
 
 ## Usage (Setup)
 
@@ -17,8 +25,12 @@ HTTPLogger.register()
 ```swift
 let configuration = NSURLSessionConfiguration.defaultSessionConfiguration()
 HTTPLogger.setup(configuration)
+
+// Sample Alamofire
+Alamofire.Manager(configuration: configuration)
 ```
 
+### Custom
 - Use custom print function
 
 ```swift
