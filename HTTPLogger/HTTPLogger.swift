@@ -34,7 +34,7 @@ public final class HTTPLogger: NSURLProtocol {
         NSURLProtocol.unregisterClass(self)
     }
     
-    public class func setup(configuration: NSURLSessionConfiguration) {        
+    public class func setup(configuration: NSURLSessionConfiguration) {
         configuration.protocolClasses?.insert(HTTPLogger.self, atIndex: 0)
     }
     
@@ -59,12 +59,13 @@ public final class HTTPLogger: NSURLProtocol {
     public override func startLoading() {
         guard let req = request.mutableCopy() as? NSMutableURLRequest where newRequest == nil else { return }
         
-        self.newRequest = req
+        newRequest = req
         
         HTTPLogger.setProperty(true, forKey: HTTPLogger.requestHandledKey, inRequest: newRequest!)
         HTTPLogger.setProperty(NSDate(), forKey: HTTPLogger.requestTimeKey, inRequest: newRequest!)
         
         connection = NSURLConnection(request: newRequest!, delegate: self)
+        NSURLConnection(request: <#T##NSURLRequest#>, delegate: <#T##AnyObject?#>, startImmediately: <#T##Bool#>)
         
         logRequest(newRequest!)
     }
