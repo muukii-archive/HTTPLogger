@@ -21,11 +21,16 @@
 // THE SOFTWARE.
 
 public protocol HTTPLoggerConfigurationType {
+    var bodyTrimLength: Int { get }
     func printLog(string: String)
     func enableCapture(request: NSURLRequest) -> Bool
 }
 
 extension HTTPLoggerConfigurationType {
+    
+    public var bodyTrimLength: Int {
+        return 10000
+    }
     
     public func printLog(string: String) {
         print(string)
@@ -164,7 +169,7 @@ public final class HTTPLogger: NSURLProtocol, NSURLSessionDelegate {
             let bodyString = NSString(data: data, encoding: NSUTF8StringEncoding) {
             
             logString += "Body:\n"
-            logString += bodyString as String
+            logString += trimTextOverflow(bodyString as String, length: HTTPLogger.configuration.bodyTrimLength)
         }
         
         if let dataStream = request.HTTPBodyStream {
@@ -181,7 +186,7 @@ public final class HTTPLogger: NSURLProtocol, NSURLSessionDelegate {
             
             if let bodyString = NSString(data: data, encoding: NSUTF8StringEncoding) {
                 logString += "Body:\n"
-                logString += bodyString as String
+                logString += trimTextOverflow(bodyString as String, length: HTTPLogger.configuration.bodyTrimLength)
             }
         }
         
@@ -249,5 +254,14 @@ public final class HTTPLogger: NSURLProtocol, NSURLSessionDelegate {
     private var data: NSMutableData?
     private var response: NSURLResponse?
     private var newRequest: NSMutableURLRequest?
+    
+    private func trimTextOverflow(string: String, length: Int) -> String {
+        
+        guard string.characters.count > length else {
+            return string
+        }
+        
+        return string.substringToIndex(string.startIndex.advancedBy(length)) + "…"
+    }
 }
 
